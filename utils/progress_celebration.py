@@ -1,73 +1,54 @@
 """
-Geração de PDF do Relatório Completo usando fpdf2 com suporte a Unicode.
-Usa fonte DejaVuSans para acentos corretos em português.
+Celebração de progresso com recompensas visuais.
+Motiva o usuário leigo a continuar preenchendo.
 """
 
-from fpdf import FPDF
-import os
+import streamlit as st
 
 
-class RelatorioPDF(FPDF):
-    def __init__(self):
-        super().__init__(format="A4")
-        # Tenta carregar fonte Unicode; fallback para Helvetica
-        font_dir = os.path.join(os.path.dirname(__file__), "fonts")
-        try:
-            self.add_font("DejaVu", "", os.path.join(font_dir, "DejaVuSans.ttf"), uni=True)
-            self.add_font("DejaVu", "B", os.path.join(font_dir, "DejaVuSans-Bold.ttf"), uni=True)
-            self.default_font = "DejaVu"
-        except Exception:
-            self.default_font = "Helvetica"
-
-    def header(self):
-        if self.page_no() == 1:
-            self.set_font(self.default_font, "B", 20)
-            self.set_text_color(30, 41, 59)
-            self.cell(0, 15, "Relatório Estratégico — SIPE10", ln=True, align="C")
-            self.ln(5)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font(self.default_font, "I", 8)
-        self.set_text_color(120, 120, 120)
-        self.cell(0, 10, f"Página {self.page_no()}", align="C")
-
-
-def markdown_to_pdf_bytes(markdown_text: str) -> bytes:
-    pdf = RelatorioPDF()
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.add_page()
-
-    text = markdown_text.lstrip("\ufeff")
-
-    for raw_line in text.split("\n"):
-        line = raw_line.rstrip()
-
-        if line.startswith("# "):
-            pdf.set_font(pdf.default_font, "B", 18)
-            pdf.set_text_color(30, 41, 59)
-            pdf.ln(4)
-            pdf.multi_cell(0, 10, line[2:])
-            pdf.ln(2)
-        elif line.startswith("## "):
-            pdf.set_font(pdf.default_font, "B", 14)
-            pdf.set_text_color(37, 99, 235)
-            pdf.ln(3)
-            pdf.multi_cell(0, 8, line[3:])
-            pdf.ln(1)
-        elif line.startswith("### "):
-            pdf.set_font(pdf.default_font, "B", 12)
-            pdf.set_text_color(15, 23, 42)
-            pdf.multi_cell(0, 7, line[4:])
-        elif line.startswith("- "):
-            pdf.set_font(pdf.default_font, "", 11)
-            pdf.set_text_color(15, 23, 42)
-            pdf.multi_cell(0, 6, f"  •  {line[2:]}")
-        elif line.strip() == "":
-            pdf.ln(2)
-        else:
-            pdf.set_font(pdf.default_font, "", 11)
-            pdf.set_text_color(15, 23, 42)
-            pdf.multi_cell(0, 6, line)
-
-    return bytes(pdf.output())
+def celebrate_progress(data: dict):
+    """Mostra barra de progresso e celebrações em marcos."""
+    total = 0
+    filled = 0
+    
+    # BMC (9 campos)
+    bmc = data.get("bmc", {})
+    total += 9
+    filled += sum(1 for v in bmc.values() if v and str(v).strip())
+    
+    # SWOT (4 quadrantes)
+    swot = data.get("swot", {})
+    total += 4
+    filled += sum(1 for k in ["forcas", "fraquezas", "oportunidades", "ameacas"] 
+                  if swot.get(k) and len(swot[k]) > 0)
+    
+    # Empresa (4 campos)
+    emp = data.get("empresa", {})
+    total += 4
+    filled += sum(1 for v in emp.values() if v and str(v).strip())
+    
+    # 5W2H (mínimo 1 ação)
+    acoes = data.get("acao_5w2h", [])
+    total += 1
+    if acoes and any(a.get("what", "").strip() for a in acoes):
+        filled += 1
+    
+    pct = (filled / total) * 100 if total > 0 else 0
+    
+    st.progress(pct / 100, text=f"Seu planejamento está {pct:.0f}% completo")
+    
+    # Celebrações por marco (apenas uma vez por sessão)
+    if 20 <= pct < 25 and not st.session_state.get("celebrated_20"):
+        st.balloons()
+        st.toast("🎉 Você já começou! O primeiro passo é o mais importante.", icon="🎉")
+        st.session_state.celebrated_20 = True
+    
+    if 50 <= pct < 55 and not st.session_state.get("celebrated_50"):
+        st.balloons()
+        st.toast("🚀 Metade do caminho! Você está construindo algo valioso.", icon="🚀")
+        st.session_state.celebrated_50 = True
+    
+    if 90 <= pct < 95 and not st.session_state.get("celebrated_90"):
+        st.balloons()
+        st.toast("🏆 Quase lá! Seu relatório estratégico está quase pronto.", icon="🏆")
+        st.session_state.celebrated_90 = True
