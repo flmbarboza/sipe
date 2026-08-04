@@ -1,113 +1,111 @@
 import streamlit as st
 from utils.page_template import setup_page, track_page
-from utils.pdf_export import markdown_to_pdf_bytes
+from utils.ai_helper import ai_assist_widget
 from utils.contextual_helper import render_contextual_helper
+from utils.ai_provider import AIProvider
 
-st.set_page_config(page_title="Relatório Completo", page_icon="📄", layout="wide")
-data = setup_page("Relatório Completo", "📄")
-tracker = track_page("Relatório Completo")
+st.set_page_config(page_title="Business Model Canvas", page_icon="📋", layout="wide")
+data = setup_page("Business Model Canvas", "📋")
+tracker = track_page("Business Model Canvas")
 
-st.title("📄 Relatório Completo")
-st.caption("Gere um documento profissional com todo o seu planejamento estratégico.")
+st.title("📋 Como sua empresa funciona?")
+st.caption("Vamos desenhar o modelo de negócio — um mapa simples que mostra como sua empresa cria valor e ganha dinheiro.")
 
-def build_report(data):
-    emp = data.get("empresa", {})
-    bmc = data.get("bmc", {})
-    swot = data.get("swot", {})
-    mvv = data.get("mvv", {})
-    objs = data.get("objetivos", [])
-    acoes = data.get("acao_5w2h", [])
-    fin = data.get("financeiro", {})
+st.info("""
+**O que é um modelo de negócio?**  
+É como um blueprint da sua empresa. Responde perguntas simples: quem compra de você? O que você vende? Como entrega? Quanto custa para produzir? Quanto ganha?  
+Empresas que têm isso claro crescem com mais segurança.
 
-    report = f"""# Relatório Estratégico — {emp.get('nome', 'Empresa')}
+💡 **Não precisa preencher tudo de uma vez.** Clique em qualquer cartão abaixo para começar. 
+Não sabe o que colocar? Use o botão "Consultar IA" — ele dá exemplos do seu setor.
+""")
 
-## 1. Dados da Empresa
-- **Nome:** {emp.get('nome', 'Não informado')}
-- **Setor:** {emp.get('setor', 'Não informado')}
-- **Local:** {emp.get('cidade_estado', 'Não informado')}
-- **Responsável:** {emp.get('responsavel', 'Não informado')}
+# ========== BMC GRID ==========
+bmc = data["bmc"]
+setor = data.get("empresa", {}).get("setor", "geral")
 
-## 2. Modelo de Negócio (Business Model Canvas)
-- **Clientes:** {bmc.get('segmentos_clientes', 'Não preenchido')}
-- **Proposta de Valor:** {bmc.get('proposta_valor', 'Não preenchido')}
-- **Canais:** {bmc.get('canais', 'Não preenchido')}
-- **Relacionamento:** {bmc.get('relacionamento_clientes', 'Não preenchido')}
-- **Receitas:** {bmc.get('fontes_receita', 'Não preenchido')}
-- **Recursos:** {bmc.get('recursos_chave', 'Não preenchido')}
-- **Atividades:** {bmc.get('atividades_chave', 'Não preenchido')}
-- **Parcerias:** {bmc.get('parcerias_chave', 'Não preenchido')}
-- **Custos:** {bmc.get('estrutura_custos', 'Não preenchido')}
+# Mapeamento dos 9 blocos com explicações leigas
+BLOCOS = [
+    ("segmentos_clientes", "🎯 Clientes", "Quem compra ou usa o que você oferece?", 
+     "Pense em: quem compra? quem usa? Existem grupos diferentes? Ex: jovens de 18-25 anos, pequenas empresas, pais de crianças..."),
+    ("proposta_valor", "💎 Proposta de valor", "Qual problema você resolve e qual valor entrega?",
+     "Pense em: qual necessidade você atende? Que benefício entrega? O que diferencia sua solução? Ex: preço acessível, maior qualidade, conveniência..."),
+    ("canais", "📡 Canais", "Como o cliente encontra, compra e recebe sua solução?",
+     "Considere: divulgação, venda, entrega, atendimento. Ex: loja física, Instagram, site, WhatsApp..."),
+    ("relacionamento_clientes", "❤️ Relacionamento", "Como sua empresa conquista e mantém clientes?",
+     "Exemplos: atendimento personalizado, programa de fidelidade, comunidade, suporte pós-venda..."),
+    ("fontes_receita", "💰 Receitas", "Como sua empresa ganha dinheiro?",
+     "Considere: o que o cliente paga? Como paga? Qual modelo de cobrança? Ex: venda direta, assinatura mensal, comissão..."),
+    ("recursos_chave", "🧱 Recursos", "Quais recursos são necessários para o negócio funcionar?",
+     "Podem ser: pessoas, equipamentos, tecnologia, marca, capital. Ex: equipe especializada, máquinas, sistema de gestão..."),
+    ("atividades_chave", "⚙️ Atividades", "Quais são as tarefas mais importantes do dia a dia?",
+     "O que você faz todos os dias para entregar valor? Ex: produzir, vender, atender, entregar..."),
+    ("parcerias_chave", "🤝 Parcerias", "Quem ajuda você a entregar valor?",
+     "Fornecedores, distribuidores, parceiros estratégicos. Ex: fornecedor de matéria-prima, plataforma de pagamentos..."),
+    ("estrutura_custos", "💸 Custos", "Quais são os principais gastos para manter tudo funcionando?",
+     "Aluguel, salários, matéria-prima, marketing, impostos. Liste os maiores custos mensais."),
+]
 
-## 3. Análise SWOT
-### Forças
-"""
-    for f in swot.get("forcas", []):
-        report += f"- {f.get('descricao', '')}\n"
+for chave, titulo, pergunta, dica in BLOCOS:
+    with st.container():
+        st.markdown(f"---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.subheader(titulo)
+            st.caption(pergunta)
+        with col2:
+            # Status de preenchimento
+            if bmc.get(chave, "").strip():
+                st.success("✅ Preenchido")
+            else:
+                st.info("⏳ Aguardando")
 
-    report += "### Fraquezas\n"
-    for f in swot.get("fraquezas", []):
-        report += f"- {f.get('descricao', '')}\n"
+        # Campo com tooltip e fallback
+        col_input, col_help = st.columns([3, 1])
+        with col_input:
+            valor = st.text_area(
+                f"Descreva aqui",
+                value=bmc.get(chave, ""),
+                key=f"bmc_{chave}",
+                help=dica,
+                placeholder="Escreva com suas palavras. Não precisa ser perfeito."
+            )
+            if valor != bmc.get(chave, ""):
+                bmc[chave] = valor
 
-    report += "### Oportunidades\n"
-    for f in swot.get("oportunidades", []):
-        report += f"- {f.get('descricao', '')}\n"
+        with col_help:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🤷 Não sei ainda", key=f"help_{chave}"):
+                st.info(f"""
+                **Tudo bem!** Aqui estão perguntas para te ajudar:
 
-    report += "### Ameaças\n"
-    for f in swot.get("ameacas", []):
-        report += f"- {f.get('descricao', '')}\n"
+                {dica}
 
-    report += f"""
-## 4. Missão, Visão e Valores
-- **Missão:** {mvv.get('missao', 'Não preenchido')}
-- **Visão:** {mvv.get('visao', 'Não preenchido')}
-- **Valores:** {', '.join(mvv.get('valores', [])) or 'Não preenchido'}
+                Ou use o botão "Consultar IA" abaixo para ver exemplos do setor **{setor}**.
+                """)
 
-## 5. Objetivos Estratégicos
-"""
-    for o in objs:
-        report += f"- **{o.get('objetivo', '')}** — KPI: {o.get('kpi', '')} | Meta: {o.get('meta', '')} | Prazo: {o.get('prazo', '')}\n"
+        # IA Assist
+        system = f"""Você é um consultor de negócios. O usuário está preenchendo o bloco \"{titulo}\" do Business Model Canvas para uma empresa do setor {setor}.
+Dê sugestões práticas, exemplos reais e valide o que foi escrito. Seja encorajador."""
 
-    report += "\n## 6. Plano de Ação (5W2H)\n"
-    for a in acoes:
-        report += f"- **{a.get('what', '')}** — Quem: {a.get('who', '')} | Quando: {a.get('when', '')} | Como: {a.get('how', '')}\n"
+        def prompt_builder(instrucao):
+            contexto = f"Setor: {setor}\nBloco: {titulo}\nPergunta: {pergunta}\nTexto atual: {bmc.get(chave, '')}"
+            if instrucao.strip():
+                return f"{contexto}\n\nPedido do usuário: {instrucao}"
+            return f"{contexto}\n\nSugira preenchimentos ou exemplos para este bloco."
 
-    report += f"""
-## 7. Orçamento
-- **Investimento Inicial:** R$ {fin.get('investimento_inicial', 0):,.2f}
-- **Receitas Mensais:** R$ {sum(r.get('valor', 0) for r in fin.get('receitas', [])):,.2f}
-- **Custos Mensais:** R$ {sum(c.get('valor', 0) for c in fin.get('custos', [])):,.2f}
+        sugestao = ai_assist_widget(f"bmc_{chave}", titulo, system, prompt_builder)
+        if sugestao:
+            bmc[chave] = sugestao
+            st.rerun()
 
----
-*Relatório gerado pelo SIPE10 — Planejamento Estratégico*
-"""
-    return report
+st.divider()
 
-st.subheader("📄 Pré-visualização")
-report_md = build_report(data)
-st.markdown(report_md)
+# Navegação
+st.markdown("### Próximo passo")
+st.markdown("Depois de entender seu modelo de negócio, vamos analisar o ambiente ao redor da sua empresa.")
+if st.button("Ir para Análise PESTEL →", type="primary"):
+    st.switch_page("pages/2_🌍_Análise_PESTEL.py")
 
-st.subheader("⬇️ Exportar")
-col1, col2 = st.columns(2)
-with col1:
-    st.download_button(
-        "Baixar como Markdown",
-        data=report_md,
-        file_name="relatorio_estrategico.md",
-        mime="text/markdown",
-        use_container_width=True
-    )
-with col2:
-    try:
-        pdf_bytes = markdown_to_pdf_bytes(report_md)
-        st.download_button(
-            "Baixar como PDF",
-            data=pdf_bytes,
-            file_name="relatorio_estrategico.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-    except Exception as e:
-        st.error(f"Erro ao gerar PDF: {e}")
-        st.info("💡 Para PDF com acentos corretos, baixe as fontes DejaVuSans e coloque em utils/fonts/")
-
-render_contextual_helper("Relatório Completo", data)
+# Sidebar: assistente contextual
+render_contextual_helper("Business Model Canvas", data)
