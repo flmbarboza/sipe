@@ -1,80 +1,148 @@
 """
-Assistente contextual no sidebar.
-Sabe em qual página o usuário está e oferece ajuda relevante.
+Gerenciador central de dados do SIPE10 v2.
+
+Toda a informação do app fica em st.session_state["data"], seguindo
+uma estrutura única (dicionário aninhado). Este módulo cuida de:
+- inicializar a estrutura padrão
+- exportar/importar tudo em JSON (upload/download)
+- funções auxiliares de leitura/escrita seguras
+- merge de novas chaves em versões futuras
 """
 
+import json
+import copy
 import streamlit as st
-from utils.ai_provider import AIProvider
 
-
-QUICK_QUESTIONS = {
-    "Business Model Canvas": [
-        "O que é 'proposta de valor'?",
-        "Dê exemplos de modelo de negócio para o meu setor",
-        "Preciso preencher todos os 9 blocos de uma vez?",
-    ],
-    "Análise PESTEL": [
-        "O que significa PESTEL?",
-        "Como identificar oportunidades políticas?",
-        "Dê exemplos de fatores econômicos",
-    ],
-    "5 Forças de Porter": [
-        "O que são as 5 forças de Porter?",
-        "Como avaliar a intensidade da rivalidade?",
-        "Meu negócio é pequeno, preciso disso?",
-    ],
-    "Análise SWOT": [
-        "O que é SWOT?",
-        "Qual a diferença entre força e oportunidade?",
-        "Como fazer a matriz cruzada?",
-    ],
-    "Planejamento Estratégico": [
-        "O que é missão, visão e valores?",
-        "Como definir objetivos estratégicos?",
-        "O que são KPIs?",
-    ],
-    "Plano de Ação 5W2H": [
-        "O que significa 5W2H?",
-        "Como definir prazos realistas?",
-        "Quem deve ser o responsável?",
-    ],
+DEFAULT_DATA = {
+    "empresa": {
+        "nome": "",
+        "setor": "",
+        "cidade_estado": "",
+        "responsavel": "",
+    },
+    "bmc": {
+        "segmentos_clientes": "",
+        "proposta_valor": "",
+        "canais": "",
+        "relacionamento_clientes": "",
+        "fontes_receita": "",
+        "recursos_chave": "",
+        "atividades_chave": "",
+        "parcerias_chave": "",
+        "estrutura_custos": "",
+    },
+    "pestel": {
+        "Político": [],
+        "Econômico": [],
+        "Social": [],
+        "Tecnológico": [],
+        "Ecológico": [],
+        "Legal": [],
+    },
+    "porter": {
+        "Rivalidade entre concorrentes": {"intensidade": 3, "notas": ""},
+        "Poder de barganha dos clientes": {"intensidade": 3, "notas": ""},
+        "Poder de barganha dos fornecedores": {"intensidade": 3, "notas": ""},
+        "Ameaça de novos entrantes": {"intensidade": 3, "notas": ""},
+        "Ameaça de produtos substitutos": {"intensidade": 3, "notas": ""},
+    },
+    "swot": {
+        "forcas": [],
+        "fraquezas": [],
+        "oportunidades": [],
+        "ameacas": [],
+    },
+    "mvv": {
+        "missao": "",
+        "visao": "",
+        "valores": [],
+    },
+    "swot_cruzada": {
+        "SO": [],
+        "ST": [],
+        "WO": [],
+        "WT": [],
+    },
+    "objetivos": [],
+    "financeiro": {
+        "investimento_inicial": 0.0,
+        "receitas": [],
+        "custos": [],
+        "horizonte_meses": 12,
+    },
+    "acao_5w2h": [],
+    "departamentos": {},
+    "orcamento": {},
+    "monitoramento": {},
+    "revisao": {},
 }
 
 
-def render_contextual_helper(page_name: str, data: dict):
-    """Renderiza o assistente contextual na sidebar."""
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown("### 💬 Assistente Estratégico")
-
-        questions = QUICK_QUESTIONS.get(page_name, ["Como posso ajudar?"])
-        st.markdown("<p style='font-size:12px; color:#64748b; margin-bottom:8px;'>Dúvidas comuns nesta etapa:</p>", unsafe_allow_html=True)
-
-        for q in questions:
-            if st.button(q, key=f"quick_q_{q[:20]}_{page_name}", use_container_width=True):
-                _answer_question(page_name, q, data)
-
-        pergunta = st.text_input(
-            "Ou digite sua dúvida...",
-            key=f"chat_input_{page_name}",
-            placeholder="Ex: não entendi o que é SWOT",
-            label_visibility="collapsed"
-        )
-
-        if pergunta:
-            _answer_question(page_name, pergunta, data)
+def init_data():
+    """Garante que st.session_state['data'] existe com a estrutura padrão."""
+    if "data" not in st.session_state:
+        st.session_state["data"] = copy.deepcopy(DEFAULT_DATA)
+    else:
+        _merge_defaults(st.session_state["data"], DEFAULT_DATA)
 
 
-def _answer_question(page_name: str, pergunta: str, data: dict):
-    with st.spinner("Pensando..."):
-        provider = AIProvider()
-        setor = data.get("empresa", {}).get("setor", "geral")
+def _merge_defaults(current, defaults):
+    for key, value in defaults.items():
+        if key not in current:
+            current[key] = copy.deepcopy(value)
+        elif isinstance(value, dict) and isinstance(current.get(key), dict):
+            _merge_defaults(current[key], value)
 
-        system = f"""Você é um consultor de negócios amigável e paciente.
-O usuário está na página '{page_name}' do planejamento estratégico.
-Explique conceitos de forma simples, como se estivesse conversando com um amigo.
-Use exemplos do setor {setor} quando possível.
-Nunca use jargão sem explicar. Seja encorajador."""
 
-        resposta = provider.ask(system, pergunta, max_tokens=500)
-        st.markdown(f"<div style='background:#f8fafc; border-radius:8px; padding:12px; font-size:13px; line-height:1.6; margin-top:8px;'>{resposta}</div>", unsafe_allow_html=True)
+def get_data():
+    init_data()
+    return st.session_state["data"]
+
+
+def to_json_bytes():
+    data = get_data()
+    return json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def load_json_bytes(file_bytes):
+    """Carrega um JSON exportado anteriormente e substitui os dados da sessão."""
+    novo = json.loads(file_bytes.decode("utf-8"))
+    merged = copy.deepcopy(DEFAULT_DATA)
+    _merge_defaults(novo, DEFAULT_DATA)
+    merged.update(novo)
+    st.session_state["data"] = merged
+
+
+def reset_data():
+    st.session_state["data"] = copy.deepcopy(DEFAULT_DATA)
+
+
+def sidebar_data_controls():
+    """Widgets de upload/download reutilizados na barra lateral."""
+    st.sidebar.markdown("### 💾 Dados do planejamento")
+
+    st.sidebar.download_button(
+        "⬇️ Baixar dados (.json)",
+        data=to_json_bytes(),
+        file_name="sipe10_plano.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+    uploaded = st.sidebar.file_uploader(
+        "⬆️ Carregar dados (.json)", type=["json"], key="upload_dados_json"
+    )
+    if uploaded is not None:
+        if st.sidebar.button("Confirmar importação", use_container_width=True):
+            try:
+                load_json_bytes(uploaded.getvalue())
+                st.sidebar.success("Dados carregados com sucesso!")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Erro ao importar: {e}")
+
+    with st.sidebar.expander("⚠️ Zerar tudo"):
+        st.write("Isso apaga todos os dados preenchidos na sessão atual.")
+        if st.button("Confirmar reset total", type="primary"):
+            reset_data()
+            st.rerun()
